@@ -113,7 +113,7 @@ void Engine::run()
 		}
 
 		InputConsole::textAsk("exit");
-		if(InputConsole::selectFromList({ "Yes", "No" }) == 1)
+		if(InputConsole::selectFromList({ "Yes", "No" }) == 0)
 			break;
 	}
 
