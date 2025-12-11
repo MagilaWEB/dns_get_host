@@ -39,75 +39,78 @@ void Engine::run()
 		for (auto& entry : std::filesystem::directory_iterator(patch_domain))
 			all_file.push_back(entry.path().stem().string());
 
-		auto index = InputConsole::selectFromList(all_file);
+		if (!all_file.empty())
+		{
+			auto index = InputConsole::selectFromList(all_file);
 
-		std::string file_name{ all_file[index] };
+			std::string file_name{ all_file[index] };
 
-		File domain{};
-		domain.open(patch_domain / file_name, ".list", true);
+			File domain{};
+			domain.open(patch_domain / file_name, ".list", true);
 
-		File dns_host{};
-		dns_host.open(patch_dns_host / (file_name + "_dns"), ".list", true);
-		dns_host.clear();
+			File dns_host{};
+			dns_host.open(patch_dns_host / (file_name + "_dns"), ".list", true);
+			dns_host.clear();
 
-		CriticalSection lock{};
+			CriticalSection lock{};
 
-		domain.forLine(
-			[&dns_host, &lock](std::string str)
-			{
-				Core::get().addTaskParallel(
-					[&dns_host, &lock, str]
-					{
-						auto lines = Core::get().exec("nslookup " + str);
-						bool start_addresses{ false };
-
-						for (auto& line : lines)
+			domain.forLine(
+				[&dns_host, &lock](std::string str)
+				{
+					Core::get().addTaskParallel(
+						[&dns_host, &lock, str]
 						{
-							static std::regex invalid_ipv6{ ".*::" };
-							if (std::regex_match(line, std::regex{ "Addresses:.*(?:.*|\\n)" }) && !start_addresses)
+							auto lines = Core::get().exec("nslookup " + str);
+							bool start_addresses{ false };
+
+							for (auto& line : lines)
 							{
-								start_addresses = true;
+								static std::regex invalid_ipv6{ ".*::" };
+								if (std::regex_match(line, std::regex{ "Addresses:.*(?:.*|\\n)" }) && !start_addresses)
+								{
+									start_addresses = true;
 
-								size_t pos	   = line.find_first_not_of("Addresses:  ");
-								auto   address = line.substr(pos, line.length());
-								utils::trim(address);
+									size_t pos	   = line.find_first_not_of("Addresses:  ");
+									auto   address = line.substr(pos, line.length());
+									utils::trim(address);
 
-								if (std::regex_match(address, invalid_ipv6))
+									if (std::regex_match(address, invalid_ipv6))
+										continue;
+
+									std::string string = utils::format("%s %s", str.c_str(), address.c_str());
+
+									CRITICAL_SECTION_RAII(lock);
+									dns_host.writeText(string);
+									Debug::info("%s", string.c_str());
 									continue;
+								}
 
-								std::string string = utils::format("%s %s", str.c_str(), address.c_str());
+								if (std::regex_match(line, std::regex{ "Aliases:.*(?:.*|\\n)" }) && start_addresses)
+									start_addresses = false;
 
-								CRITICAL_SECTION_RAII(lock);
-								dns_host.writeText(string);
-								Debug::info("%s", string.c_str());
-								continue;
-							}
+								utils::trim(line);
+								if (start_addresses && !line.empty())
+								{
+									if (std::regex_match(line, invalid_ipv6))
+										continue;
 
-							if (std::regex_match(line, std::regex{ "Aliases:.*(?:.*|\\n)" }) && start_addresses)
-								start_addresses = false;
+									std::string string = utils::format("%s %s", str.c_str(), line.c_str());
 
-							utils::trim(line);
-							if (start_addresses && !line.empty())
-							{
-								if (std::regex_match(line, invalid_ipv6))
-									continue;
-
-								std::string string = utils::format("%s %s", str.c_str(), line.c_str());
-
-								CRITICAL_SECTION_RAII(lock);
-								dns_host.writeText(string);
-								Debug::info("%s", string.c_str());
+									CRITICAL_SECTION_RAII(lock);
+									dns_host.writeText(string);
+									Debug::info("%s", string.c_str());
+								}
 							}
 						}
-					}
-				);
-				return false;
-			}
-		);
+					);
+					return false;
+				}
+			);
 
-		Core::get().waitTaskParallel();
+			Core::get().waitTaskParallel();
 
-		dns_host.close();
+			dns_host.close();
+		}
 
 		InputConsole::textAsk("exit");
 		if(InputConsole::selectFromList({ "Yes", "No" }) == 1)
