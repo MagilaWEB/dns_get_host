@@ -24,7 +24,12 @@ void Engine::initialize()
 void Engine::run()
 {
 	auto patch_domain	= Core::get().userPath() / "domains";
+	if (!std::filesystem::is_directory(patch_domain))
+		std::filesystem::create_directory(patch_domain);
+
 	auto patch_dns_host = Core::get().userPath() / "hosts";
+	if (!std::filesystem::is_directory(patch_dns_host))
+		std::filesystem::create_directory(patch_dns_host);
 
 	std::vector<std::string> all_file{};
 
