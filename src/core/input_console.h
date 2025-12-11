@@ -1,0 +1,107 @@
+#pragma once
+#include "virtual_key_codes.hpp"
+
+class CORE_API InputConsole final
+{
+	inline static CriticalSection _lock;
+	enum class ColorType : u16
+	{
+		BLACK,
+		DARK_BLUE,
+		DARK_GREEN,
+		LIGHT_BLUE,
+		DARK_RED,
+		MAGENTA,
+		ORANGE,
+		LIGHT_GRAY,
+		GRAY,
+		BLUE,
+		GREEN,
+		CYAN,
+		RED,
+		PINK,
+		YELLOW,
+		WHITE
+	};
+
+public:
+	InputConsole()	= default;
+	~InputConsole() = default;
+
+	static void		   pause(pcstr info = "");
+	static std::string getString();
+	static u32		   getU32();
+	static u32		   sendNum(std::list<u8> nums);
+	static bool		   getBool();
+
+	template<typename Type = std::list<std::string>>
+	static size_t selectFromList(const Type& list, std::function<void(size_t select)>&& callback = [](size_t) {});
+
+	template<typename... Args>
+	static void text(pcstr text, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		msg(text, "%s", ColorType::CYAN, true, std::forward<Args>(args)...);
+		std::cout << std::endl;
+	}
+
+	template<typename... Args>
+	static void textOk(pcstr text, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		msg(text, "Успех: %s", ColorType::GREEN, true, std::forward<Args>(args)...);
+		std::cout << std::endl;
+	}
+
+	template<typename... Args>
+	static void textInfo(pcstr text, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		msg(text, "Информация: %s", ColorType::YELLOW, true, std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	static void textAsk(pcstr text, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		std::cout << std::endl;
+		msg(text, "%s???", ColorType::DARK_GREEN, true, std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	static void textWarning(pcstr text, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		msg(text, "Предупреждение: %s", ColorType::ORANGE, true, std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	static void textError(pcstr text, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		msg(text, "Ошибка: %s", ColorType::RED, true, std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	static void textPlease(pcstr text, bool reset_color, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		msg(text, "Пожалуйста, %s:", ColorType::CYAN, reset_color, std::forward<Args>(args)...);
+	}
+
+	static std::string textColor(pcstr text, ColorType type, bool reset_color = true);
+
+	static void clear();
+
+private:
+	template<typename... Args>
+	static void msg(pcstr text, pcstr prefix, ColorType type, bool reset_color, Args&&... args)
+	{
+		CriticalSection::raii mt{ _lock };
+		std::string			  mod_text = utils::format(prefix, utils::format(text, std::forward<Args>(args)...).c_str());
+		mod_text					   = textColor(mod_text.c_str(), type, reset_color);
+		Debug::print("%s", mod_text.c_str());
+	}
+
+	static bool _forbiddenCharacters(const std::string& text);
+};
