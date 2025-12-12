@@ -77,7 +77,7 @@ void Engine::run()
 									if (std::regex_match(address, invalid_ipv6))
 										continue;
 
-									std::string string = utils::format("%s %s", str.c_str(), address.c_str());
+									std::string string = utils::format("%s %s", address.c_str(), str.c_str());
 
 									CRITICAL_SECTION_RAII(lock);
 									dns_host.writeText(string);
@@ -94,7 +94,7 @@ void Engine::run()
 									if (std::regex_match(line, invalid_ipv6))
 										continue;
 
-									std::string string = utils::format("%s %s", str.c_str(), line.c_str());
+									std::string string = utils::format("%s %s", line.c_str(), str.c_str());
 
 									CRITICAL_SECTION_RAII(lock);
 									dns_host.writeText(string);
