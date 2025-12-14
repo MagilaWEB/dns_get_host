@@ -26,7 +26,7 @@ public:
 
 	void initialize(const std::string& command_line);
 
-	std::list<std::string> exec(std::string cmd);
+	std::vector<std::string> exec(std::string cmd);
 	void parallel_run();
 	void finish();
 

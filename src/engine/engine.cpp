@@ -23,7 +23,7 @@ void Engine::initialize()
 
 void Engine::run()
 {
-	auto patch_domain	= Core::get().userPath() / "domains";
+	auto patch_domain = Core::get().userPath() / "domains";
 	if (!std::filesystem::is_directory(patch_domain))
 		std::filesystem::create_directory(patch_domain);
 
@@ -61,44 +61,51 @@ void Engine::run()
 						[&dns_host, &lock, str]
 						{
 							auto lines = Core::get().exec("nslookup " + str);
-							bool start_addresses{ false };
 
-							for (auto& line : lines)
+							static std::array<std::string, 2> iter{ "Address:", "Addresses:" };
+
+							for (auto& it : iter)
 							{
-								static std::regex invalid_ipv6{ ".*::" };
-								if (std::regex_match(line, std::regex{ "Addresses:.*(?:.*|\\n)" }) && !start_addresses)
+								bool start_addresses{ false };
+								for ( size_t i = 3; i < lines.size(); i++)
 								{
-									start_addresses = true;
+									auto&			  line = lines[i];
+									static std::regex invalid_ipv6{ ".*::" };
 
-									size_t pos	   = line.find_first_not_of("Addresses:  ");
-									auto   address = line.substr(pos, line.length());
-									utils::trim(address);
+									if (std::regex_match(line, std::regex{ it + ".*(?:.*|\\n)" }) && !start_addresses)
+									{
+										start_addresses = true;
 
-									if (std::regex_match(address, invalid_ipv6))
+										size_t pos	   = line.find_first_not_of(it + "  ");
+										auto   address = line.substr(pos, line.length());
+										utils::trim(address);
+
+										if (std::regex_match(address, invalid_ipv6))
+											continue;
+
+										std::string string = utils::format("%s %s", address.c_str(), str.c_str());
+
+										CRITICAL_SECTION_RAII(lock);
+										dns_host.writeText(string);
+										Debug::info("%s", string.c_str());
 										continue;
+									}
 
-									std::string string = utils::format("%s %s", address.c_str(), str.c_str());
+									if (std::regex_match(line, std::regex{ "Aliases:.*(?:.*|\\n)" }) && start_addresses)
+										start_addresses = false;
 
-									CRITICAL_SECTION_RAII(lock);
-									dns_host.writeText(string);
-									Debug::info("%s", string.c_str());
-									continue;
-								}
+									utils::trim(line);
+									if (start_addresses && !line.empty())
+									{
+										if (std::regex_match(line, invalid_ipv6))
+											continue;
 
-								if (std::regex_match(line, std::regex{ "Aliases:.*(?:.*|\\n)" }) && start_addresses)
-									start_addresses = false;
+										std::string string = utils::format("%s %s", line.c_str(), str.c_str());
 
-								utils::trim(line);
-								if (start_addresses && !line.empty())
-								{
-									if (std::regex_match(line, invalid_ipv6))
-										continue;
-
-									std::string string = utils::format("%s %s", line.c_str(), str.c_str());
-
-									CRITICAL_SECTION_RAII(lock);
-									dns_host.writeText(string);
-									Debug::info("%s", string.c_str());
+										CRITICAL_SECTION_RAII(lock);
+										dns_host.writeText(string);
+										Debug::info("%s", string.c_str());
+									}
 								}
 							}
 						}
@@ -113,7 +120,7 @@ void Engine::run()
 		}
 
 		InputConsole::textAsk("exit");
-		if(InputConsole::selectFromList({ "Yes", "No" }) == 0)
+		if (InputConsole::selectFromList({ "Yes", "No" }) == 0)
 			break;
 	}
 

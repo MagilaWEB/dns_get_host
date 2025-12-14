@@ -46,12 +46,12 @@ void Core::initialize(const std::string& /*command_line*/)
 {
 }
 
-std::list<std::string> Core::exec(std::string cmd)
+std::vector<std::string> Core::exec(std::string cmd)
 {
 	if (std::unique_ptr<FILE, decltype(&_pclose)> pipe{ _popen(cmd.c_str(), "r"), _pclose })
 	{
 		std::array<char, 1'024> buffer{};
-		std::list<std::string>	result{};
+		std::vector<std::string> result{};
 
 		while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe.get()) != nullptr)
 			result.push_back(buffer.data());
